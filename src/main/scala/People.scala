@@ -1,3 +1,4 @@
+//import slick.driver.MySQLDriver.api._
 import slick.jdbc.MySQLProfile.api._
 
 class People(tag: Tag) extends Table[(Int, String, String, Int)](tag, "PEOPLE") {
