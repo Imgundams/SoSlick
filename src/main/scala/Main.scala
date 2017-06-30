@@ -1,57 +1,79 @@
-import java.time.Duration
-
-import com.sun.net.httpserver.Authenticator.Failure
-
+import slick.jdbc.MySQLProfile.api._
+import slick.lifted.TableQuery
+import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, Future}
+import scala.util.{Failure, Success}
 
-/**
-	* Created by Administrator on 30/06/2017.
-	*/
-object Main extends App{
+object Main extends App {
 
 
+	// The config string refers to mysqlDB that we defined in application.conf
+	val db = Database.forConfig("so_slick")
 
+
+	// represents the actual table on which we will be building queries on
+	val peopleTable = TableQuery[People]
+
+	// schema definition to generate DROP statement for people table
+	val dropPeopleCmd = DBIO.seq(peopleTable.schema.drop)
+
+	// schema definition to generate a CREATE TABLE command
+	val initPeopleCmd = DBIO.seq(peopleTable.schema.create)
 
 
 	print("Yoooooo")
 
 
-
-
-
-
-
-
-
-
-	def dropDB={
-		val dropFuture = Future{db.run(dropPeopleCmd)}
-		Await.result(dropFuture, Duration.Inf).andThen{
+	def dropDB = {
+		//do a drop followed by initialisePeople
+		// val dropFuture = Future{db.run(dropPeopleCmd)}    //Attempt to drop the table, Await does not block here
+		Await.result(dropFuture,Duration.Inf).andThen {
 			case Success(_) => initialisePeople
-				case Failure(error) => println("Bang!")
+			case Failure(error) =>
+				println("Dropping the table failed due to: " + error.getMessage)
+				initialisePeople
 		}
 	}
 
+
+	def initialisePeople = { //initialise people
+		val setupFuture = Future {
+			db.run(initPeopleCmd)
+		} //once our DB has finished initializing we are ready to roll, Await does not block
+		Await.result(setupFuture, Duration.Inf).andThen {
+			case Success(_) => runQuery
+			case Failure(error) =>
+				println("Initialising the table failed due to: " + error.getMessage)
+		}
+	}
+
+
 	def runQuery = {
-		val insertPeople= Future {
+		val insertPeople = Future {
 			val query = peopleTable ++= Seq(
 				(10, "Jack", "Wood", 36),
 				(20, "Tim", "Brown", 24)
-			)
-			println(query.statements.head)
+			) // insert into `PEOPLE` (`PER_FNAME`,`PER_LNAME`,`PER_AGE`)  values (?,?,?)
+			println(query.statements.head) // would print out the query one line up
 			db.run(query)
 		}
-		Await.result(insertPeople, Duration.Inf).andThen{
-			case Success(_) => println("Good Job")
-				case Failure(error)=> println("Bad Job")
+		Await.result(insertPeople, Duration.Inf).andThen {
+			case Success(_) => listPeople
+			case Failure(error) => println("May Martin Odersky have mercy on you! Something went terribly wrong! " + error.getMessage)
 		}
 	}
 
+
 	def listPeople = {
-		val queryFuture = Future{
-			db.run(peopleTable.result).map(_.foreach{
-				case
+		val queryFuture = Future {
+			// simple query that selects everything from People and prints them out
+			db.run(peopleTable.result).map(_.foreach {
+				case (id, fName, lName, age) => println(s" $id $fName $lName $age")
 			})
+		}
+		Await.result(queryFuture, Duration.Inf).andThen {
+			case Success(_) => db.close() //cleanup DB connection
+			case Failure(error) => println("Listing people failed due to: " + error.getMessage)
 		}
 	}
 
