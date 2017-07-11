@@ -26,7 +26,7 @@ object Main extends App {
 	//runQueryUpdate(3, "Scala James", "Whiteley", 22)
 
 	averagePeoplesAge
-	print("Yoooooo")
+	print("Testing")
 
 
 	def dropDB = {
